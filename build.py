@@ -19,7 +19,7 @@ def build():
         sys.executable,
         '-m',
         'PyInstaller',
-        '--name', 'ModernDiff',
+        '--name', 'DiffNote',
         '--onefile',
         '--windowed',
         '--clean',

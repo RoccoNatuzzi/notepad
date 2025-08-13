@@ -9,9 +9,10 @@ class TextDiffApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        ctk.set_default_color_theme("theme.json")
         ctk.set_appearance_mode("light")
 
-        self.title("Modern Text Editor & Diff Tool")
+        self.title("DiffNote")
         self.geometry("1200x800")
 
         # configure grid layout
@@ -38,7 +39,7 @@ class TextDiffApp(ctk.CTk):
 
         # The editor toolbar has been replaced by the main menu bar.
 
-        self.tab_view = ctk.CTkTabview(self.editor_frame)
+        self.tab_view = ctk.CTkTabview(self.editor_frame, anchor="w") # Align tabs to the left
         self.tab_view.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
         # Data structures to manage tabs
@@ -46,12 +47,8 @@ class TextDiffApp(ctk.CTk):
         self.tab_filepaths = {}
         self.new_file_count = 0
 
-        # Create a welcome tab
-        self.tab_view.add("Welcome")
-        welcome_label = ctk.CTkLabel(self.tab_view.tab("Welcome"), text="Welcome to ModernDiff!\n\nUse 'Open File' to begin.")
-        welcome_label.pack(expand=True)
-
         self._create_menu()
+        self.add_new_tab() # Start with a blank tab
 
     def _create_menu(self):
         """Creates the main window menu bar."""
@@ -97,10 +94,6 @@ class TextDiffApp(ctk.CTk):
 
     def add_new_tab(self, filepath=None):
         """Creates a new tab, either for a new file or an existing one."""
-        # Remove welcome tab if it exists
-        if "Welcome" in self.tab_view._name_list:
-            self.tab_view.delete("Welcome")
-
         if filepath:
             filename = os.path.basename(filepath)
             # Prevent opening the same file in multiple tabs
@@ -118,7 +111,6 @@ class TextDiffApp(ctk.CTk):
         editor_with_linenumbers = TextEditorWithLineNumbers(tab_frame)
         editor_with_linenumbers.pack(fill="both", expand=True)
 
-        # We store the custom widget instance. It delegates get/insert/delete to its internal textbox.
         textbox = editor_with_linenumbers
 
         self.editor_textboxes[tab_name] = textbox
@@ -139,7 +131,7 @@ class TextDiffApp(ctk.CTk):
     def save_file(self):
         """Saves the content of the currently active tab."""
         current_tab = self.tab_view.get()
-        if not current_tab or current_tab == "Welcome":
+        if not current_tab:
             return
 
         filepath = self.tab_filepaths.get(current_tab)
@@ -148,12 +140,12 @@ class TextDiffApp(ctk.CTk):
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content)
         else:
-            self.save_file_as() # If it's a new file, prompt for a name
+            self.save_file_as()
 
     def save_file_as(self):
         """Saves the current tab's content to a new file."""
         current_tab = self.tab_view.get()
-        if not current_tab or current_tab == "Welcome":
+        if not current_tab:
             return
 
         new_filepath = filedialog.asksaveasfilename(
@@ -179,11 +171,10 @@ class TextDiffApp(ctk.CTk):
     def close_current_tab(self, force=False):
         """Closes the currently active tab."""
         current_tab = self.tab_view.get()
-        if not current_tab or current_tab == "Welcome":
+        if not current_tab:
             return
 
         # In a real app, we'd check for unsaved changes here.
-        # The 'force' flag is to bypass this for the save_as workaround.
 
         self.tab_view.delete(current_tab)
         del self.editor_textboxes[current_tab]
@@ -191,9 +182,7 @@ class TextDiffApp(ctk.CTk):
             del self.tab_filepaths[current_tab]
 
         if len(self.tab_view._name_list) == 0:
-             self.tab_view.add("Welcome")
-             welcome_label = ctk.CTkLabel(self.tab_view.tab("Welcome"), text="Welcome to ModernDiff!\n\nUse 'Open File' to begin.")
-             welcome_label.pack(expand=True)
+            self.add_new_tab()
 
     def start_comparison(self):
         """
