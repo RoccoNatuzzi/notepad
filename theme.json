@@ -2,6 +2,14 @@
   "CTk": {
     "fg_color": ["#F2F2F7", "#1F1F1F"]
   },
+  "CTkFont": {
+    "family": "sans-serif",
+    "size": 13,
+    "weight": "normal",
+    "slant": "roman",
+    "underline": 0,
+    "overstrike": 0
+  },
   "CTkFrame": {
     "corner_radius": 6,
     "border_width": 1,
