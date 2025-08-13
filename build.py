@@ -24,6 +24,7 @@ def build():
         '--windowed',
         '--clean',
         add_data_flag,
+        '--add-data=theme.json:.',
         'src/main_app.py'
     ]
 

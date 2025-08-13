@@ -1,15 +1,26 @@
 import customtkinter as ctk
 import os
+import sys
 import tkinter as tk
 from tkinter import filedialog
 from src.file_differ import compare_files_to_unified_diff
 from src.ui_components import TextEditorWithLineNumbers
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 class TextDiffApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        ctk.set_default_color_theme("theme.json")
+        ctk.set_default_color_theme(resource_path("theme.json"))
         ctk.set_appearance_mode("light")
 
         self.title("DiffNote")
