@@ -54,6 +54,13 @@
     "button_color": ["#D0D0DA", "gray41"],
     "button_hover_color": ["#A9A9A9", "gray53"]
   },
+  "CTkScrollableFrame": {
+    "corner_radius": 6,
+    "border_width": 1,
+    "fg_color": ["#FFFFFF", "#2B2B2B"],
+    "border_color": ["#D0D0DA", "#343638"],
+    "label_fg_color": ["#1F1F1F", "#DCE4EE"]
+  },
   "CTkTabview": {
     "corner_radius": 6,
     "border_width": 1,
