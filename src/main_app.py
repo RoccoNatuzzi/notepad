@@ -3,7 +3,8 @@ import os
 import sys
 import tkinter as tk
 from tkinter import filedialog
-from src.file_differ import compare_files_to_unified_diff
+from src.character_differ import get_character_diffs
+from src.diff_viewer import DiffViewer
 from src.ui_components import TextEditorWithLineNumbers
 
 def resource_path(relative_path):
@@ -85,17 +86,13 @@ class TextDiffApp(ctk.CTk):
         tools_menu.add_command(label="Compare Files...", command=self.start_comparison)
 
     def _create_comparison_view(self):
-        self.comparison_frame = ctk.CTkFrame(self.main_content)
+        self.comparison_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
         self.comparison_frame.grid(row=0, column=0, sticky="nsew")
         self.comparison_frame.grid_rowconfigure(0, weight=1)
         self.comparison_frame.grid_columnconfigure(0, weight=1)
-        self.comparison_frame.grid_columnconfigure(1, weight=1)
 
-        self.file1_scroll_frame = ctk.CTkScrollableFrame(self.comparison_frame, label_text="File 1")
-        self.file1_scroll_frame.grid(row=0, column=0, sticky="nsew", padx=(5, 2), pady=5)
-
-        self.file2_scroll_frame = ctk.CTkScrollableFrame(self.comparison_frame, label_text="File 2")
-        self.file2_scroll_frame.grid(row=0, column=1, sticky="nsew", padx=(2, 5), pady=5)
+        self.diff_viewer = DiffViewer(self.comparison_frame, merge_callback=self._perform_merge)
+        self.diff_viewer.pack(fill="both", expand=True)
 
     def show_editor_view(self):
         self.editor_frame.tkraise()
@@ -197,7 +194,7 @@ class TextDiffApp(ctk.CTk):
 
     def start_comparison(self):
         """
-        Prompts the user to select two files and initiates the comparison.
+        Prompts the user to select two files and initiates the character-level comparison.
         """
         file1_path = filedialog.askopenfilename(title="Select the First File")
         if not file1_path:
@@ -207,96 +204,37 @@ class TextDiffApp(ctk.CTk):
         if not file2_path:
             return
 
-        diff_results = compare_files_to_unified_diff(file1_path, file2_path)
-
-        # This will be implemented in the next step.
-        self._display_diff(file1_path, file2_path, diff_results)
-
-        self.show_comparison_view()
-
-    def _display_diff(self, file1_path, file2_path, diff_results):
-        """Displays the diff with interactive merge buttons by tracking line numbers."""
         self.file1_path = file1_path
         self.file2_path = file2_path
-        self.file1_lines = [line.rstrip('\n') for line in open(file1_path, 'r', encoding='utf-8').readlines()]
-        self.file2_lines = [line.rstrip('\n') for line in open(file2_path, 'r', encoding='utf-8').readlines()]
 
-        for widget in self.file1_scroll_frame.winfo_children(): widget.destroy()
-        for widget in self.file2_scroll_frame.winfo_children(): widget.destroy()
+        with open(file1_path, 'r', encoding='utf-8') as f:
+            self.text1 = f.read()
+        with open(file2_path, 'r', encoding='utf-8') as f:
+            self.text2 = f.read()
 
-        f1_idx, f2_idx = 0, 0
+        opcodes = get_character_diffs(self.text1, self.text2)
+        self.diff_viewer.display_diff(self.text1, self.text2, opcodes)
+        self.show_comparison_view()
 
-        for line in diff_results:
-            if line.startswith('@@'):
-                # Extract line numbers from hunk header, e.g., @@ -1,5 +1,5 @@
-                parts = line.split(' ')
-                f1_start = int(parts[1].split(',')[0].replace('-', '')) - 1
-                f2_start = int(parts[2].split(',')[0].replace('+', '')) - 1
-                f1_idx, f2_idx = f1_start, f2_start
-                continue
-            if line.startswith('---') or line.startswith('+++'):
-                continue
+    def _perform_merge(self, direction, op_idx):
+        """Applies a change from one file to the other based on character diff opcodes."""
+        opcodes = self.diff_viewer.opcodes
+        _, i1, i2, j1, j2 = opcodes[op_idx]
 
-            line_type = line[0]
-            line_content = line[1:]
+        if direction == 'to_left':  # Apply change from right to left
+            self.text1 = self.text1[:i1] + self.text2[j1:j2] + self.text1[i2:]
+        elif direction == 'to_right':  # Apply change from left to right
+            self.text2 = self.text2[:j1] + self.text1[i1:i2] + self.text2[j2:]
 
-            if line_type == ' ':
-                self._render_line('common', line_content)
-                f1_idx += 1
-                f2_idx += 1
-            elif line_type == '-':
-                self._render_line('deletion', line_content, f1_idx, f2_idx)
-                f1_idx += 1
-            elif line_type == '+':
-                self._render_line('addition', line_content, f1_idx, f2_idx)
-                f2_idx += 1
-
-    def _render_line(self, line_type, content, f1_idx=None, f2_idx=None):
-        """Renders a single line and a merge button if it's a diff."""
-        DELETION_COLOR, ADDITION_COLOR, EMPTY_COLOR = "#FADBD8", "#D4EFDF", "#F2F3F4"
-        mono_font = ctk.CTkFont(family="Courier", size=12)
-
-        if line_type == 'common':
-            ctk.CTkLabel(self.file1_scroll_frame, text=content, anchor="w", font=mono_font).pack(fill="x", expand=True)
-            ctk.CTkLabel(self.file2_scroll_frame, text=content, anchor="w", font=mono_font).pack(fill="x", expand=True)
-        elif line_type == 'deletion':
-            f = ctk.CTkFrame(self.file1_scroll_frame, fg_color=DELETION_COLOR)
-            f.pack(fill="x", expand=True)
-            ctk.CTkLabel(f, text=content, anchor="w", font=mono_font, fg_color="transparent").pack(side="left", fill="x", expand=True)
-            ctk.CTkButton(f, text="→", width=30, command=lambda i1=f1_idx, i2=f2_idx: self._perform_merge('to_right', i1, i2)).pack(side="right")
-            ctk.CTkLabel(self.file2_scroll_frame, text="", fg_color=EMPTY_COLOR, anchor="w", font=mono_font).pack(fill="x", expand=True)
-        elif line_type == 'addition':
-            ctk.CTkLabel(self.file1_scroll_frame, text="", fg_color=EMPTY_COLOR, anchor="w", font=mono_font).pack(fill="x", expand=True)
-            f = ctk.CTkFrame(self.file2_scroll_frame, fg_color=ADDITION_COLOR)
-            f.pack(fill="x", expand=True)
-            ctk.CTkLabel(f, text=content, anchor="w", font=mono_font, fg_color="transparent").pack(side="left", fill="x", expand=True)
-            ctk.CTkButton(f, text="←", width=30, command=lambda i1=f1_idx, i2=f2_idx: self._perform_merge('to_left', i1, i2)).pack(side="right")
-
-    def _perform_merge(self, direction, f1_idx, f2_idx):
-        """Applies a change from one file to the other and refreshes the view."""
-        if direction == 'to_left':
-            # An addition on the right is merged left.
-            # We take the line from file 2 and insert it into file 1's model.
-            if f2_idx < len(self.file2_lines):
-                line_to_add = self.file2_lines[f2_idx]
-                self.file1_lines.insert(f1_idx, line_to_add)
-
-        elif direction == 'to_right':
-            # A deletion on the left is merged right.
-            # This means we "undo" the deletion by adding the line to file 2's model.
-            if f1_idx < len(self.file1_lines):
-                line_to_add = self.file1_lines[f1_idx]
-                self.file2_lines.insert(f2_idx, line_to_add)
-
-        # Save the modified content back to the original files to make the change persistent
+        # Save the modified content back to the original files
         with open(self.file1_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(self.file1_lines))
+            f.write(self.text1)
         with open(self.file2_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(self.file2_lines))
+            f.write(self.text2)
 
-        # Rerun the comparison on the modified files and refresh the view
-        diff_results = compare_files_to_unified_diff(self.file1_path, self.file2_path)
-        self._display_diff(self.file1_path, self.file2_path, diff_results)
+        # Rerun the comparison and refresh the view
+        new_opcodes = get_character_diffs(self.text1, self.text2)
+        self.diff_viewer.display_diff(self.text1, self.text2, new_opcodes)
 
 
 if __name__ == "__main__":
