@@ -9,28 +9,19 @@ class TextDiffApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light")
 
         self.title("Modern Text Editor & Diff Tool")
         self.geometry("1200x800")
 
         # configure grid layout
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # --- Top Frame for Buttons ---
-        self.top_frame = ctk.CTkFrame(self, height=40)
-        self.top_frame.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
-
-        self.editor_button = ctk.CTkButton(self.top_frame, text="Editor", command=self.show_editor_view)
-        self.editor_button.pack(side="left", padx=5, pady=5)
-
-        self.compare_button = ctk.CTkButton(self.top_frame, text="Compare Files", command=self.start_comparison)
-        self.compare_button.pack(side="left", padx=5, pady=5)
-
         # --- Main Content Frame ---
+        # The top frame with buttons is removed, the menu is used instead.
         self.main_content = ctk.CTkFrame(self)
-        self.main_content.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.main_content.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         self.main_content.grid_rowconfigure(0, weight=1)
         self.main_content.grid_columnconfigure(0, weight=1)
 
@@ -79,6 +70,11 @@ class TextDiffApp(ctk.CTk):
         file_menu.add_command(label="Close Tab", command=self.close_current_tab)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.destroy)
+
+        # Tools Menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Compare Files...", command=self.start_comparison)
 
     def _create_comparison_view(self):
         self.comparison_frame = ctk.CTkFrame(self.main_content)
