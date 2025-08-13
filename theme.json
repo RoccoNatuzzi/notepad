@@ -43,7 +43,9 @@
     "border_width": 1,
     "fg_color": ["#FFFFFF", "#2B2B2B"],
     "border_color": ["#D0D0DA", "#343638"],
-    "text_color": ["#1F1F1F", "#DCE4EE"]
+    "text_color": ["#1F1F1F", "#DCE4EE"],
+    "scrollbar_button_color": ["#D0D0DA", "gray41"],
+    "scrollbar_button_hover_color": ["#A9A9A9", "gray53"]
   },
   "CTkScrollbar": {
     "corner_radius": 10,
