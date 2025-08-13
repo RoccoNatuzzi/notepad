@@ -23,7 +23,8 @@
     "fg_color": ["#2563EB", "#2563EB"],
     "hover_color": ["#A855F7", "#A855F7"],
     "text_color": ["#FFFFFF", "#FFFFFF"],
-    "text_color_disabled": ["#D0D0DA", "#555A66"]
+    "text_color_disabled": ["#D0D0DA", "#555A66"],
+    "border_color": ["#2563EB", "#2563EB"]
   },
   "CTkLabel": {
     "corner_radius": 0,

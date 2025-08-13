@@ -21,9 +21,9 @@ class TextEditorWithLineNumbers(ctk.CTkFrame):
         self.scrollbar = ctk.CTkScrollbar(self, command=self._on_scroll)
         self.scrollbar.grid(row=0, column=2, sticky='ns')
 
-        # Connect widgets to the scrollbar
+        # Connect only textbox to the scrollbar
         self.textbox.configure(yscrollcommand=self.scrollbar.set)
-        self.line_numbers.configure(yscrollcommand=self.scrollbar.set)
+        # Do not connect line_numbers to scrollbar as we want it to stay fixed
 
         # Event bindings
         self.textbox.bind("<<Modified>>", self._on_text_modified, add=True)
@@ -33,20 +33,17 @@ class TextEditorWithLineNumbers(ctk.CTkFrame):
         self.after(100, self._update_line_numbers)
 
     def _on_scroll(self, *args):
-        """Unified scroll command."""
+        """Scroll only the textbox, then update line numbers."""
         self.textbox.yview(*args)
-        self.line_numbers.yview(*args)
         self.after(10, self._update_line_numbers)
 
     def _on_mouse_wheel(self, event):
-        """Proxy mouse wheel events to the scrollbar."""
+        """Proxy mouse wheel events to the scrollbar for textbox only."""
         self.scrollbar.set(self.textbox.yview()[0], self.textbox.yview()[1])
         if event.delta > 0:
             self.textbox.yview_scroll(-1, "units")
-            self.line_numbers.yview_scroll(-1, "units")
         else:
             self.textbox.yview_scroll(1, "units")
-            self.line_numbers.yview_scroll(1, "units")
         self._update_line_numbers()
         return "break" # Prevents the event from propagating further
 
@@ -58,31 +55,35 @@ class TextEditorWithLineNumbers(ctk.CTkFrame):
         self.line_numbers.delete("all")
 
         try:
-            # Get the y-position of the top of the visible text
-            y_position = self.textbox.yview()[0]
-
-            # Get the line index at the top of the visible area
-            first_line_index = self.textbox.index(f"@0,{int(y_position * self.textbox.winfo_height())}")
-
-            # Get line details
-            dline = self.textbox.dlineinfo(first_line_index)
-            if dline is None: return
-
-            y, line_num = dline[1], int(first_line_index.split('.')[0])
-
-            # Adjust y to be relative to the canvas, not the entire textbox content
-            visible_y = y - (y_position * self.textbox.winfo_height())
-
-            # Draw numbers for all visible lines
-            while visible_y < self.textbox.winfo_height():
-                self.line_numbers.create_text(40, visible_y, anchor='ne', text=str(line_num), fill='#6A6A6A', font=self.textbox.font)
-
-                next_line = f"{line_num + 1}.0"
-                dline = self.textbox.dlineinfo(next_line)
-                if not dline: break
-
-                visible_y += dline[3] # Add line height to y
-                line_num += 1
+            # Get the total number of lines in the text
+            total_lines = int(self.textbox.index('end-1c').split('.')[0])
+            if total_lines < 1: return
+            
+            # Get the first visible line
+            first_visible = self.textbox.index('@0,0')
+            first_line_num = int(first_visible.split('.')[0])
+            
+            # Get the last visible line
+            last_visible = self.textbox.index(f'@0,{self.textbox.winfo_height()}')
+            last_line_num = int(last_visible.split('.')[0])
+            
+            # Create a font object for line numbers
+            line_font = self.textbox.cget('font')
+            
+            # Draw line numbers for all visible lines
+            for line_num in range(first_line_num, min(last_line_num + 2, total_lines + 1)):
+                # Get the y-coordinate of the line
+                dline = self.textbox.dlineinfo(f"{line_num}.0")
+                if not dline: continue
+                
+                # Draw the line number
+                self.line_numbers.create_text(
+                    30, dline[1], 
+                    anchor='e', 
+                    text=str(line_num), 
+                    fill='#6A6A6A', 
+                    font=line_font
+                )
         except (tk.TclError, ValueError):
             # Can happen if the widget is not ready or text is empty
             pass

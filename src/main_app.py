@@ -3,9 +3,9 @@ import os
 import sys
 import tkinter as tk
 from tkinter import filedialog
-from src.character_differ import get_character_diffs
-from src.diff_viewer import DiffViewer
-from src.ui_components import TextEditorWithLineNumbers
+from character_differ import get_character_diffs
+from diff_viewer import DiffViewer
+from ui_components import TextEditorWithLineNumbers
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """

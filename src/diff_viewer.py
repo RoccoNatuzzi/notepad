@@ -68,7 +68,7 @@ class DiffViewer(ctk.CTkFrame):
         text_widget.pack(side="left", fill="x", expand=True)
 
         arrow = "→" if direction == 'to_right' else "←"
-        button = ctk.CTkButton(frame, text=arrow, width=30,
+        button = ctk.CTkButton(frame, text=arrow, width=30, font=self.font,
                                command=lambda d=direction, i=op_idx: self._on_merge(d, i))
         button.pack(side="right", padx=5, pady=5)
 
