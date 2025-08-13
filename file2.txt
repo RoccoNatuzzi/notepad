@@ -1,0 +1,5 @@
+This is the first line, but modified.
+This line is the same in both files.
+This line has been replaced.
+This new line was inserted.
+This is the end of the second file.
