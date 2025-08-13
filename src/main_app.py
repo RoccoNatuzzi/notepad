@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import os
+import tkinter as tk
 from tkinter import filedialog
 from src.file_differ import compare_files_to_unified_diff
 from src.ui_components import TextEditorWithLineNumbers
