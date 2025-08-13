@@ -1,11 +1,20 @@
 import subprocess
 import sys
 import os
+import customtkinter
 
 def build():
     """
-    Runs PyInstaller to build the executable.
+    Runs PyInstaller to build the executable, ensuring customtkinter data
+    files are included.
     """
+    # Get the path to the customtkinter library
+    ctk_path = os.path.dirname(customtkinter.__file__)
+
+    # The --add-data flag format is 'source:destination'
+    # We want to copy the customtkinter directory into the root of the executable
+    add_data_flag = f"--add-data={ctk_path}:customtkinter"
+
     pyinstaller_command = [
         sys.executable,
         '-m',
@@ -14,6 +23,7 @@ def build():
         '--onefile',
         '--windowed',
         '--clean',
+        add_data_flag,
         'src/main_app.py'
     ]
 
