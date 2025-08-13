@@ -1,0 +1,5 @@
+This is the first line.
+This line is the same in both files.
+This line will be replaced.
+This line will be deleted.
+This is the end of the first file.
