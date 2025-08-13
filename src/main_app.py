@@ -1,10 +1,14 @@
 import customtkinter as ctk
+import os
 from tkinter import filedialog
 from src.file_differ import compare_files_to_unified_diff
+from src.ui_components import TextEditorWithLineNumbers
 
 class TextDiffApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        ctk.set_appearance_mode("dark")
 
         self.title("Modern Text Editor & Diff Tool")
         self.geometry("1200x800")
@@ -35,22 +39,45 @@ class TextDiffApp(ctk.CTk):
         self.show_editor_view()
 
     def _create_editor_view(self):
-        self.editor_frame = ctk.CTkFrame(self.main_content)
+        self.editor_frame = ctk.CTkFrame(self.main_content, fg_color="transparent")
         self.editor_frame.grid(row=0, column=0, sticky="nsew")
         self.editor_frame.grid_rowconfigure(1, weight=1)
         self.editor_frame.grid_columnconfigure(0, weight=1)
 
-        editor_toolbar = ctk.CTkFrame(self.editor_frame)
-        editor_toolbar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # The editor toolbar has been replaced by the main menu bar.
 
-        open_btn = ctk.CTkButton(editor_toolbar, text="Open File", command=self.open_file)
-        open_btn.pack(side="left", padx=5)
+        self.tab_view = ctk.CTkTabview(self.editor_frame)
+        self.tab_view.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
 
-        save_btn = ctk.CTkButton(editor_toolbar, text="Save File", command=self.save_file)
-        save_btn.pack(side="left", padx=5)
+        # Data structures to manage tabs
+        self.editor_textboxes = {}
+        self.tab_filepaths = {}
+        self.new_file_count = 0
 
-        self.editor_textbox = ctk.CTkTextbox(self.editor_frame)
-        self.editor_textbox.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        # Create a welcome tab
+        self.tab_view.add("Welcome")
+        welcome_label = ctk.CTkLabel(self.tab_view.tab("Welcome"), text="Welcome to ModernDiff!\n\nUse 'Open File' to begin.")
+        welcome_label.pack(expand=True)
+
+        self._create_menu()
+
+    def _create_menu(self):
+        """Creates the main window menu bar."""
+        menubar = tk.Menu(self)
+        self.config(menu=menubar)
+
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+
+        file_menu.add_command(label="New File", command=lambda: self.add_new_tab())
+        file_menu.add_command(label="Open...", command=self.open_file)
+        file_menu.add_separator()
+        file_menu.add_command(label="Save", command=self.save_file)
+        file_menu.add_command(label="Save As...", command=self.save_file_as)
+        file_menu.add_separator()
+        file_menu.add_command(label="Close Tab", command=self.close_current_tab)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.destroy)
 
     def _create_comparison_view(self):
         self.comparison_frame = ctk.CTkFrame(self.main_content)
@@ -71,23 +98,105 @@ class TextDiffApp(ctk.CTk):
     def show_comparison_view(self):
         self.comparison_frame.tkraise()
 
+    def add_new_tab(self, filepath=None):
+        """Creates a new tab, either for a new file or an existing one."""
+        # Remove welcome tab if it exists
+        if "Welcome" in self.tab_view._name_list:
+            self.tab_view.delete("Welcome")
+
+        if filepath:
+            filename = os.path.basename(filepath)
+            # Prevent opening the same file in multiple tabs
+            if filepath in self.tab_filepaths.values():
+                for tab_name, f_path in self.tab_filepaths.items():
+                    if f_path == filepath:
+                        self.tab_view.set(tab_name)
+                        return
+            tab_name = filename
+        else:
+            self.new_file_count += 1
+            tab_name = f"Untitled-{self.new_file_count}"
+
+        tab_frame = self.tab_view.add(tab_name)
+        editor_with_linenumbers = TextEditorWithLineNumbers(tab_frame)
+        editor_with_linenumbers.pack(fill="both", expand=True)
+
+        # We store the custom widget instance. It delegates get/insert/delete to its internal textbox.
+        textbox = editor_with_linenumbers
+
+        self.editor_textboxes[tab_name] = textbox
+        self.tab_filepaths[tab_name] = filepath
+
+        if filepath:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                textbox.insert("1.0", f.read())
+
+        self.tab_view.set(tab_name)
+
     def open_file(self):
-        filepath = filedialog.askopenfilename()
-        if not filepath:
-            return
-        with open(filepath, "r", encoding="utf-8") as f:
-            self.editor_textbox.delete("1.0", "end")
-            self.editor_textbox.insert("1.0", f.read())
-        self.title(f"Editor - {filepath}")
+        """Opens one or more files in new tabs."""
+        filepaths = filedialog.askopenfilenames()
+        for filepath in filepaths:
+            self.add_new_tab(filepath=filepath)
 
     def save_file(self):
-        filepath = filedialog.asksaveasfilename(defaultextension=".txt",
-                                                filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
-        if not filepath:
+        """Saves the content of the currently active tab."""
+        current_tab = self.tab_view.get()
+        if not current_tab or current_tab == "Welcome":
             return
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(self.editor_textbox.get("1.0", "end"))
-        self.title(f"Editor - {filepath}")
+
+        filepath = self.tab_filepaths.get(current_tab)
+        if filepath:
+            content = self.editor_textboxes[current_tab].get("1.0", "end-1c")
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            self.save_file_as() # If it's a new file, prompt for a name
+
+    def save_file_as(self):
+        """Saves the current tab's content to a new file."""
+        current_tab = self.tab_view.get()
+        if not current_tab or current_tab == "Welcome":
+            return
+
+        new_filepath = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+            initialfile=current_tab if not self.tab_filepaths.get(current_tab) else None
+        )
+        if not new_filepath:
+            return
+
+        content = self.editor_textboxes[current_tab].get("1.0", "end-1c")
+        with open(new_filepath, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Workaround for no tab rename: close old, open new
+        textbox_content = self.editor_textboxes[current_tab].get("1.0", "end-1c")
+        self.close_current_tab(force=True)
+        self.add_new_tab(filepath=new_filepath)
+        self.editor_textboxes[os.path.basename(new_filepath)].delete("1.0", "end")
+        self.editor_textboxes[os.path.basename(new_filepath)].insert("1.0", textbox_content)
+
+
+    def close_current_tab(self, force=False):
+        """Closes the currently active tab."""
+        current_tab = self.tab_view.get()
+        if not current_tab or current_tab == "Welcome":
+            return
+
+        # In a real app, we'd check for unsaved changes here.
+        # The 'force' flag is to bypass this for the save_as workaround.
+
+        self.tab_view.delete(current_tab)
+        del self.editor_textboxes[current_tab]
+        if self.tab_filepaths.get(current_tab):
+            del self.tab_filepaths[current_tab]
+
+        if len(self.tab_view._name_list) == 0:
+             self.tab_view.add("Welcome")
+             welcome_label = ctk.CTkLabel(self.tab_view.tab("Welcome"), text="Welcome to ModernDiff!\n\nUse 'Open File' to begin.")
+             welcome_label.pack(expand=True)
 
     def start_comparison(self):
         """
@@ -139,13 +248,13 @@ class TextDiffApp(ctk.CTk):
                 f1_idx += 1
                 f2_idx += 1
             elif line_type == '-':
-                self._render_line('deletion', line_content, f1_idx)
+                self._render_line('deletion', line_content, f1_idx, f2_idx)
                 f1_idx += 1
             elif line_type == '+':
-                self._render_line('addition', line_content, f2_idx)
+                self._render_line('addition', line_content, f1_idx, f2_idx)
                 f2_idx += 1
 
-    def _render_line(self, line_type, content, line_num=None):
+    def _render_line(self, line_type, content, f1_idx=None, f2_idx=None):
         """Renders a single line and a merge button if it's a diff."""
         DELETION_COLOR, ADDITION_COLOR, EMPTY_COLOR = "#FADBD8", "#D4EFDF", "#F2F3F4"
         mono_font = ctk.CTkFont(family="Courier", size=12)
@@ -157,35 +266,38 @@ class TextDiffApp(ctk.CTk):
             f = ctk.CTkFrame(self.file1_scroll_frame, fg_color=DELETION_COLOR)
             f.pack(fill="x", expand=True)
             ctk.CTkLabel(f, text=content, anchor="w", font=mono_font, fg_color="transparent").pack(side="left", fill="x", expand=True)
-            ctk.CTkButton(f, text="→", width=30, command=lambda i=line_num: self._perform_merge('to_right', i)).pack(side="right")
+            ctk.CTkButton(f, text="→", width=30, command=lambda i1=f1_idx, i2=f2_idx: self._perform_merge('to_right', i1, i2)).pack(side="right")
             ctk.CTkLabel(self.file2_scroll_frame, text="", fg_color=EMPTY_COLOR, anchor="w", font=mono_font).pack(fill="x", expand=True)
         elif line_type == 'addition':
             ctk.CTkLabel(self.file1_scroll_frame, text="", fg_color=EMPTY_COLOR, anchor="w", font=mono_font).pack(fill="x", expand=True)
             f = ctk.CTkFrame(self.file2_scroll_frame, fg_color=ADDITION_COLOR)
             f.pack(fill="x", expand=True)
             ctk.CTkLabel(f, text=content, anchor="w", font=mono_font, fg_color="transparent").pack(side="left", fill="x", expand=True)
-            ctk.CTkButton(f, text="←", width=30, command=lambda i=line_num: self._perform_merge('to_left', i)).pack(side="right")
+            ctk.CTkButton(f, text="←", width=30, command=lambda i1=f1_idx, i2=f2_idx: self._perform_merge('to_left', i1, i2)).pack(side="right")
 
-    def _perform_merge(self, direction, index):
+    def _perform_merge(self, direction, f1_idx, f2_idx):
         """Applies a change from one file to the other and refreshes the view."""
-        if direction == 'to_left': # Apply addition from right to left
-            line_to_add = self.file2_lines[index]
-            # Find where to insert in file 1. This is tricky.
-            # A simple approach is to insert it at the same index.
-            self.file1_lines.insert(index, line_to_add)
-        elif direction == 'to_right': # Apply deletion from left to right (by deleting from right)
-            # This means we are accepting the deletion that happened on the left.
-            # So we delete the corresponding line from the right side.
-            if index < len(self.file2_lines):
-                del self.file2_lines[index]
+        if direction == 'to_left':
+            # An addition on the right is merged left.
+            # We take the line from file 2 and insert it into file 1's model.
+            if f2_idx < len(self.file2_lines):
+                line_to_add = self.file2_lines[f2_idx]
+                self.file1_lines.insert(f1_idx, line_to_add)
 
-        # Save the modified content back to the original files
+        elif direction == 'to_right':
+            # A deletion on the left is merged right.
+            # This means we "undo" the deletion by adding the line to file 2's model.
+            if f1_idx < len(self.file1_lines):
+                line_to_add = self.file1_lines[f1_idx]
+                self.file2_lines.insert(f2_idx, line_to_add)
+
+        # Save the modified content back to the original files to make the change persistent
         with open(self.file1_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(self.file1_lines))
         with open(self.file2_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(self.file2_lines))
 
-        # Rerun the comparison
+        # Rerun the comparison on the modified files and refresh the view
         diff_results = compare_files_to_unified_diff(self.file1_path, self.file2_path)
         self._display_diff(self.file1_path, self.file2_path, diff_results)
 
